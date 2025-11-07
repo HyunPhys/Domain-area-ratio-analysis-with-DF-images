@@ -90,6 +90,13 @@ tiledlayout(figPrev,1,2,"Padding","compact","TileSpacing","compact");
 nexttile; imshow(Irgb, 'Border','tight'); title('Original');
 nexttile; imshow(skel, []); title('Skeleton (press any key to continue)');
 set(figPrev,'Color','w'); drawnow;
+
+if ~exist(opts.saveDir,'dir'), mkdir(opts.saveDir); end
+
+
+exportgraphics(figPrev, fullfile(opts.saveDir,'fig0_skeleton_preview.png'), 'Resolution',600);
+
+
 waitforbuttonpress; close(figPrev);
 
 
@@ -149,7 +156,6 @@ if isempty(pairs), error('형성된 쌍이 없습니다.'); end
 
 % --- 3) Skeleton 그래프 및 경로 탐색 준비 ---
 [G, lin2node, node2lin] = skeletonGraph(skel);
-if ~exist(opts.saveDir,'dir'), mkdir(opts.saveDir); end
 
 % skeleton 연결성 검증 + arc/chord 필터링
 pairs = validatePairsOnSkeleton(pairs, P_rc, P_rc_s, skel, G, lin2node, node2lin, opts.maxArcChord);
