@@ -21,10 +21,9 @@ opts = setDefault(opts,'gaussSigma',1.0);
 opts = setDefault(opts,'nmPerPx', []);   % ← 한 픽셀당 나노미터 (예: 0.52)
 opts = setDefault(opts,'minObject',64);
 opts = setDefault(opts,'saveDir',saveDir_name);
-opts = setDefault(opts,'maxPairDist',100); % 필요시 거리 제한(px)
 opts = setDefault(opts,'pairMode','quadrant');   % 'quadrant' | 'knn'
 opts = setDefault(opts,'knnK',6);                % pairMode='knn'일 때 후보 K
-opts = setDefault(opts,'maxPairDist',inf);       % 후보 거리 컷오프
+opts = setDefault(opts,'maxPairDist',inf);       % 후보 거리 컷오프 (필요시 거리 제한(px))
 opts = setDefault(opts,'maxArcChord',1.20);      % skeleton 경로의 arc/chord 허용 상한
 opts = setDefault(opts,'maxDegree',4);           % 한 점에서 허용할 최대 연결 수
 opts = setDefault(opts,'mc_N', 50);       % Monte-Carlo 반복 횟수 (기본 50)
@@ -215,7 +214,10 @@ for k=1:size(pairs,1)
 
 
     M = bendingMetrics(pathRC, p1_rc, p2_rc,opts.nmPerPx);
+    if numel(M.signed_dist_px) < 2, continue; end   % 샘플 부족 시 건너뜀
+
     M_raw = bendingMetrics(pathRC_raw, p1_rc, p2_rc,opts.nmPerPx);
+    if numel(M_raw.signed_dist_px) < 2, continue; end   % 샘플 부족 시 건너뜀
 
 
     % ---- Monte-Carlo error estimation ----

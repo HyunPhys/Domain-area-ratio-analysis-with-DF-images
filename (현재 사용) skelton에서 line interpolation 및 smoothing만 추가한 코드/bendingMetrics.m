@@ -55,10 +55,24 @@ x_proj = rel * t';               % (Nx1)
 xs = x_proj;
 ys = signed_dist;
 
+good = isfinite(xs) & isfinite(ys);
+xs = xs(good);
+ys = ys(good);
 
+if numel(xs) < 2 % 샘플이 2개 미만이면 적분 의미가 없으므로 안전 종료
+
+M.x_proj_px = xs;   % px 단위 projection coordinate
+M.area_proj_px2 = 0;
+
+
+else
 % (선택) x 중복 시 평균처리: x가 같은 위치에 점이 여러개 찍히는 경우 방지
-[xu, ia, ~] = unique(xs, 'stable');
-yu = accumarray(ia, ys, [], @mean);
+[xu, ia, ic] = unique(xs, 'stable');
+yu = accumarray(ic, ys, [], @mean);
+
+
+
+
 
 % --- trapezoidal rule: ∫ |y| dx ---
 dx = diff(xu);
@@ -67,6 +81,9 @@ A_proj_px2 = sum( 0.5 * (abs(yu(1:end-1)) + abs(yu(2:end))) .* dx );
 % Save px^2 result
 M.x_proj_px = x_proj;   % px 단위 projection coordinate
 M.area_proj_px2 = A_proj_px2;
+
+end
+
 
 
 % --- nm^2 변환 ---
