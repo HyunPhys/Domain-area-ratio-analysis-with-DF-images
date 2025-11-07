@@ -12,10 +12,15 @@ if nargin < 2 || isempty(mode), mode = 'mutual'; end
 
 if nargin < 3, opts = struct; end
 
+t_now  = datetime("now","Format","yyyyMMdd_HHmmss");
+saveDir_name = "results_" + string(t_now);
+
+
+
 opts = setDefault(opts,'gaussSigma',1.0);
 opts = setDefault(opts,'nmPerPx', []);   % ← 한 픽셀당 나노미터 (예: 0.52)
 opts = setDefault(opts,'minObject',64);
-opts = setDefault(opts,'saveDir','results');
+opts = setDefault(opts,'saveDir',saveDir_name);
 opts = setDefault(opts,'maxPairDist',100); % 필요시 거리 제한(px)
 opts = setDefault(opts,'pairMode','quadrant');   % 'quadrant' | 'knn'
 opts = setDefault(opts,'knnK',6);                % pairMode='knn'일 때 후보 K
