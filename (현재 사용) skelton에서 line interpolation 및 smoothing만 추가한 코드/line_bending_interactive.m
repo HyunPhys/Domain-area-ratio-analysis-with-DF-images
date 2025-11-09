@@ -1,4 +1,4 @@
-function line_bending_interactive(imgPath, mode, opts)
+function line_bending_interactive(imgPath, mode, opts, opts_skel)
 % line_bending_interactive  –  Click many nodes; quantify bending for each pair.
 % USAGE:
 %   line_bending_interactive('your_image.png');              % default: 'mutual'
@@ -70,22 +70,28 @@ Igray = rgb2gray(Irgb);
 %   'minObject', 120, ...        % 작은 조각 과감히 제거
 %   'spurPrune', 10);            % 짧은 가시 적극 제거
 
-opts_skel = struct( ...
-  'method','gabor', ...
-  'gaussSigma', 1.2, ...       % (1.0→1.2) 약간 더 블러
-  'gaborWavelengths', [4 6 8],... % 선 폭이 조금 굵다 가정
-  'gaborTheta', 0:10:170, ...  % 방향 분해능↑ (15→10도 간격)
-  'adaptWin', 61, ...          % 로컬 윈도우 조금 키움
-  'adaptSens', 0.42, ...       % (0.45→0.42) 이진화 더 보수적
-  'morphOpen', 1, ...          % 열기 약화(연결 유지)
-  'morphClose', 2, ...         % 닫기 강화(틈 메우기)
-  'minObject', 700, ...
-  'spurPrune', 6);             % 너무 과하게 가지치지 않음
+% opts_skel = struct( ...
+%   'method','gabor', ...
+%   'gaussSigma', 1.2, ...       % (1.0→1.2) 약간 더 블러
+%   'gaborWavelengths', [4 6 8],... % 선 폭이 조금 굵다 가정
+%   'gaborTheta', 0:10:170, ...  % 방향 분해능↑ (15→10도 간격)
+%   'adaptWin', 61, ...          % 로컬 윈도우 조금 키움
+%   'adaptSens', 0.42, ...       % (0.45→0.42) 이진화 더 보수적
+%   'morphOpen', 1, ...          % 열기 약화(연결 유지)
+%   'morphClose', 2, ...         % 닫기 강화(틈 메우기)
+%   'minObject', 700, ...
+%   'spurPrune', 6);             % 너무 과하게 가지치지 않음
 
 
 
-skel = makeSkeletonRobust(Igray, opts_skel);
+%skel = makeSkeletonRobust(Igray, opts_skel);
+[BW_raw,BW_morph,skel,opts_skel_used] = makeSkeletonRobust(Igray,opts_skel);
 
+fig_BW_raw = figure('Name','After binarize');
+imshow(BW_raw)
+
+fig_BW_morph = figure('Name','After morphology trimming');
+imshow(BW_morph)
 
 
 % (요구사항 1) skeleton 결과 한 번 표시
@@ -98,10 +104,12 @@ set(figPrev,'Color','w'); drawnow;
 if ~exist(opts.saveDir,'dir'), mkdir(opts.saveDir); end
 
 
-exportgraphics(figPrev, fullfile(opts.saveDir,'fig0_skeleton_preview.png'), 'Resolution',600);
+exportgraphics(fig_BW_raw, fullfile(opts.saveDir,'fig0_binary.png'), 'Resolution',600);
+exportgraphics(fig_BW_morph, fullfile(opts.saveDir,'fig0_morphology.png'), 'Resolution',600);
+exportgraphics(figPrev, fullfile(opts.saveDir,'fig0_skeleton_with_spurPrune.png'), 'Resolution',600);
 
 
-waitforbuttonpress; close(figPrev);
+waitforbuttonpress; close(fig_BW_raw);close(fig_BW_morph); close(figPrev);
 
 
 
@@ -113,7 +121,9 @@ waitforbuttonpress; close(figPrev);
 % P      = [x y];                 % Nx2, [x y] 두 벡터 합쳐서 하나의 행렬로. 현재는 column, row임
 % P_rc   = [P(:,2) P(:,1)];       % [r c] 근데 보통 row column을 쓰므로 그렇게 바꿈
 
-[P, P_rc] = collectPointsInteractive(Irgb);   % P=[x y], P_rc=[r c]
+[P, P_rc] = collectPointsInteractive(Irgb,skel,opts.saveDir);   % P=[x y], P_rc=[r c]
+
+
 if size(P,1) < 2, error('최소 2개 점이 필요합니다.'); end
 
 
@@ -425,6 +435,21 @@ writetable(Metrics, fullfile(opts.saveDir,'metrics.csv'));
 Metrics_raw = cell2table(Trows_raw, 'VariableNames', vars);
 save(fullfile(opts.saveDir,'metrics_raw.mat'),'Metrics_raw');
 writetable(Metrics, fullfile(opts.saveDir,'metrics_raw.csv'));
+
+save(fullfile(opts.saveDir,'parameters_opts.mat'),'opts')
+save(fullfile(opts.saveDir,'parameters_opts_skel.mat'),'opts_skel_used')
+
+
+node_point = struct();
+node_point.P = P;
+node_point.P_rc = P_rc;
+node_point.P_rc_s = P_rc_s;
+node_point.pairs = pairs;
+node_point.skel = skel;
+
+save(fullfile(opts.saveDir,'node_point.mat'),'node_point')
+
+
 
 
 disp(Metrics);
