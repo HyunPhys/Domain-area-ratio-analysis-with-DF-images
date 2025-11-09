@@ -1,6 +1,16 @@
 close all; clear all;
 
-load("results_TTT_0038_3_crop_1\metrics.mat")
+dir = "results_TTT_0038_3_crop_1";
+
+cd(dir)
+
+load("metrics.mat")
+
+
+% 시편 및 데이터 정보 적기 (같은 시편인 경우 구분 위해)
+specimen_info = '240829 TEM_대성이형';
+data_info = 'results_TTT_0038_3_crop_1';
+
 
 if exist('Metrics_raw','var')
     Metrics = Metrics_raw;
@@ -27,6 +37,18 @@ if ~(length(p_nrm) == size(dA,1))
 end
 
 Metrics.dA_real = dA .* p_nrm';
+Metrics.p_nrm = p_nrm';
+
+n = height(Metrics);
+Metrics.specimen_info = repmat(specimen_info, n, 1);
+Metrics.data_info = repmat(data_info, n, 1);
+
+Metrics = movevars(Metrics, 'data_info', 'Before', 1);
+Metrics = movevars(Metrics, 'specimen_info', 'Before', 1);
+
+save(fullfile(pwd,'metrics_with_dA.mat'),'Metrics');
+writetable(Metrics, fullfile(pwd,'metrics_with_dA.csv')); 
+
 
 figure()
 
