@@ -1,4 +1,4 @@
-function line_bending_interactive(imgPath, mode, opts, opts_skel)
+function line_bending_interactive(imgPath, mode, opts, opts_skel, is_saved,saved_node_point)
 % line_bending_interactive  –  Click many nodes; quantify bending for each pair.
 % USAGE:
 %   line_bending_interactive('your_image.png');              % default: 'mutual'
@@ -14,171 +14,188 @@ if nargin < 3, opts = struct; end
 
 t_now  = datetime("now","Format","yyyyMMdd_HHmmss");
 saveDir_name = "results_" + string(t_now);
-
-
-
-opts = setDefault(opts,'gaussSigma',1.0);
-opts = setDefault(opts,'nmPerPx', []);   % ← 한 픽셀당 나노미터 (예: 0.52)
-opts = setDefault(opts,'minObject',64);
-opts = setDefault(opts,'saveDir',saveDir_name);
-opts = setDefault(opts,'pairMode','quadrant');   % 'quadrant' | 'knn'
-opts = setDefault(opts,'knnK',6);                % pairMode='knn'일 때 후보 K
-opts = setDefault(opts,'maxPairDist',inf);       % 후보 거리 컷오프 (필요시 거리 제한(px))
-opts = setDefault(opts,'maxArcChord',1.20);      % skeleton 경로의 arc/chord 허용 상한
-opts = setDefault(opts,'maxDegree',4);           % 한 점에서 허용할 최대 연결 수
-opts = setDefault(opts,'mc_N', 50);       % Monte-Carlo 반복 횟수 (기본 50)
-opts = setDefault(opts,'mc_jitter', 1);   % px perturbation size (±1)
-opts = setDefault(opts,'sortChordAxis', false); % F3에서 x축을 정렬할지 말지 (정렬 안 하는 게 낫다고 생각함)
-
-
-% line_bending_interactive() 맨 위쪽
-if nargin>=2 && ischar(mode) && ~isempty(mode)
-    if strcmpi(mode,'mutual'), opts.pairMode = 'quadrant'; end
-    if strcmpi(mode,'sequential'), ; % 그대로 sequential 분기 사용
-    end
-end
+if ~exist(opts.saveDir,'dir'), mkdir(opts.saveDir); end
 
 
 Irgb = imread(imgPath);
 if size(Irgb,3)==1, Irgb = repmat(Irgb,[1 1 3]); end
 Igray = rgb2gray(Irgb);
 
-% --- 0) Skeleton 준비 ---
-% skel = makeSkeleton(Igray, opts.gaussSigma, opts.minObject);
 
-% opts_skel = struct( ...
-%   'method','gabor', ...
-%   'gaussSigma', 1.5, ...       % 노이즈 더 누르고
-%   'gaborWavelengths', [2 3 4],... % 가는 선 대응
-%   'gaborTheta', 0:10:170, ...
-%   'adaptWin', 71, ...
-%   'adaptSens', 0.40, ...       % 보수적으로 ON (놓치지 않도록)
-%   'morphOpen', 1, ...
-%   'morphClose', 2, ...
-%   'minObject', 60, ...
-%   'spurPrune', 6);
+if ~is_saved
 
-% opts_skel = struct( ...
-%   'method','gabor', ...
-%   'gaussSigma', 1.0, ...
-%   'gaborWavelengths', [3 4 5], ...
-%   'gaborTheta', 0:15:165, ...
-%   'adaptWin', 51, ...
-%   'adaptSens', 0.48, ...       % (0.45→0.48) 조금 더 공격적으로 ON
-%   'morphOpen', 2, ...          % 열기 강화(잡영 제거)
-%   'morphClose', 1, ...
-%   'minObject', 120, ...        % 작은 조각 과감히 제거
-%   'spurPrune', 10);            % 짧은 가시 적극 제거
+    opts = setDefault(opts,'gaussSigma',1.0);
+    opts = setDefault(opts,'nmPerPx', []);   % ← 한 픽셀당 나노미터 (예: 0.52)
+    opts = setDefault(opts,'minObject',64);
+    opts = setDefault(opts,'saveDir',saveDir_name);
+    opts = setDefault(opts,'pairMode','quadrant');   % 'quadrant' | 'knn'
+    opts = setDefault(opts,'knnK',6);                % pairMode='knn'일 때 후보 K
+    opts = setDefault(opts,'maxPairDist',inf);       % 후보 거리 컷오프 (필요시 거리 제한(px))
+    opts = setDefault(opts,'maxArcChord',1.20);      % skeleton 경로의 arc/chord 허용 상한
+    opts = setDefault(opts,'maxDegree',4);           % 한 점에서 허용할 최대 연결 수
+    opts = setDefault(opts,'mc_N', 50);       % Monte-Carlo 반복 횟수 (기본 50)
+    opts = setDefault(opts,'mc_jitter', 1);   % px perturbation size (±1)
+    opts = setDefault(opts,'sortChordAxis', false); % F3에서 x축을 정렬할지 말지 (정렬 안 하는 게 낫다고 생각함)
+    
+    
+    % line_bending_interactive() 맨 위쪽
+    if nargin>=2 && ischar(mode) && ~isempty(mode)
+        if strcmpi(mode,'mutual'), opts.pairMode = 'quadrant'; end
+        if strcmpi(mode,'sequential'), ; % 그대로 sequential 분기 사용
+        end
+    end
+    
+    
 
-% opts_skel = struct( ...
-%   'method','gabor', ...
-%   'gaussSigma', 1.2, ...       % (1.0→1.2) 약간 더 블러
-%   'gaborWavelengths', [4 6 8],... % 선 폭이 조금 굵다 가정
-%   'gaborTheta', 0:10:170, ...  % 방향 분해능↑ (15→10도 간격)
-%   'adaptWin', 61, ...          % 로컬 윈도우 조금 키움
-%   'adaptSens', 0.42, ...       % (0.45→0.42) 이진화 더 보수적
-%   'morphOpen', 1, ...          % 열기 약화(연결 유지)
-%   'morphClose', 2, ...         % 닫기 강화(틈 메우기)
-%   'minObject', 700, ...
-%   'spurPrune', 6);             % 너무 과하게 가지치지 않음
+    
+    % --- 0) Skeleton 준비 ---
+    % skel = makeSkeleton(Igray, opts.gaussSigma, opts.minObject);
+    
+    % opts_skel = struct( ...
+    %   'method','gabor', ...
+    %   'gaussSigma', 1.5, ...       % 노이즈 더 누르고
+    %   'gaborWavelengths', [2 3 4],... % 가는 선 대응
+    %   'gaborTheta', 0:10:170, ...
+    %   'adaptWin', 71, ...
+    %   'adaptSens', 0.40, ...       % 보수적으로 ON (놓치지 않도록)
+    %   'morphOpen', 1, ...
+    %   'morphClose', 2, ...
+    %   'minObject', 60, ...
+    %   'spurPrune', 6);
+    
+    % opts_skel = struct( ...
+    %   'method','gabor', ...
+    %   'gaussSigma', 1.0, ...
+    %   'gaborWavelengths', [3 4 5], ...
+    %   'gaborTheta', 0:15:165, ...
+    %   'adaptWin', 51, ...
+    %   'adaptSens', 0.48, ...       % (0.45→0.48) 조금 더 공격적으로 ON
+    %   'morphOpen', 2, ...          % 열기 강화(잡영 제거)
+    %   'morphClose', 1, ...
+    %   'minObject', 120, ...        % 작은 조각 과감히 제거
+    %   'spurPrune', 10);            % 짧은 가시 적극 제거
+    
+    % opts_skel = struct( ...
+    %   'method','gabor', ...
+    %   'gaussSigma', 1.2, ...       % (1.0→1.2) 약간 더 블러
+    %   'gaborWavelengths', [4 6 8],... % 선 폭이 조금 굵다 가정
+    %   'gaborTheta', 0:10:170, ...  % 방향 분해능↑ (15→10도 간격)
+    %   'adaptWin', 61, ...          % 로컬 윈도우 조금 키움
+    %   'adaptSens', 0.42, ...       % (0.45→0.42) 이진화 더 보수적
+    %   'morphOpen', 1, ...          % 열기 약화(연결 유지)
+    %   'morphClose', 2, ...         % 닫기 강화(틈 메우기)
+    %   'minObject', 700, ...
+    %   'spurPrune', 6);             % 너무 과하게 가지치지 않음
+    
+    
+    
+    %skel = makeSkeletonRobust(Igray, opts_skel);
+    [BW_raw,BW_morph,skel,opts_skel_used] = makeSkeletonRobust(Igray,opts_skel);
+    
+    fig_BW_raw = figure('Name','After binarize');
+    imshow(BW_raw)
+    
+    fig_BW_morph = figure('Name','After morphology trimming');
+    imshow(BW_morph)
+    
+    
+    % (요구사항 1) skeleton 결과 한 번 표시
+    figPrev = figure('Name','Skeleton preview');
+    tiledlayout(figPrev,1,2,"Padding","compact","TileSpacing","compact");
+    nexttile; imshow(Irgb, 'Border','tight'); title('Original');
+    nexttile; imshow(skel, []); title('Skeleton (press any key to continue)');
+    set(figPrev,'Color','w'); drawnow;
+   
+    
+    exportgraphics(fig_BW_raw, fullfile(opts.saveDir,'fig0_binary.png'), 'Resolution',600);
+    exportgraphics(fig_BW_morph, fullfile(opts.saveDir,'fig0_morphology.png'), 'Resolution',600);
+    exportgraphics(figPrev, fullfile(opts.saveDir,'fig0_skeleton_with_spurPrune.png'), 'Resolution',600);
+    
+    
+    waitforbuttonpress; close(fig_BW_raw);close(fig_BW_morph); close(figPrev);
+    
+    
+    
+    % --- 1) 인터랙티브 클릭 ---
+    % figure('Name','Click node points (Enter to finish)'); imshow(Irgb, 'Border','tight');
+    % title('원하는 만큼 점을 찍고 Enter');
+    % [x,y] = ginput(); close;       % x,y라는 벡터가 2개 나옴 (cols,rows)
+    % if numel(x) < 2, error('최소 2개 점이 필요합니다.'); end
+    % P      = [x y];                 % Nx2, [x y] 두 벡터 합쳐서 하나의 행렬로. 현재는 column, row임
+    % P_rc   = [P(:,2) P(:,1)];       % [r c] 근데 보통 row column을 쓰므로 그렇게 바꿈
+    
+    [P, P_rc] = collectPointsInteractive(Irgb,skel,opts.saveDir);   % P=[x y], P_rc=[r c]
+    
+    
+    if size(P,1) < 2, error('최소 2개 점이 필요합니다.'); end
+    
+    
+    % Skeleton 픽셀로 스냅
+    [rr,cc] = find(skel); 
+    SkelRC = [rr cc];
+    
+    KDT     = KDTreeSearcher(double(SkelRC));
+    idx     = knnsearch(KDT,double(P_rc));
+    P_rc_s  = SkelRC(idx,:);
+    
+    % --- 2) 쌍 구성 ---
+    % switch lower(mode)
+    %     case 'mutual'
+    %         pairs = mutualNearestPairs(P); % Mutual nearest neighbor만 뽑아 pair 형성 (인덱스 i<j)
+    %     case 'sequential'
+    %         n = size(P,1); pairs = [(1:n-1)' (2:n)']; % 클릭 순서대로 pair 형성
+    %     otherwise
+    %         error('mode must be "mutual" or "sequential".');
+    % end
+    
+    switch lower(opts.pairMode)
+        case 'quadrant'
+            % 각 점마다 4사분면(NE/NW/SE/SW)에서 가장 가까운 점을 후보로 선정
+            pairs = quadrantPairs(P, opts.maxPairDist);
+        case 'knn'
+            % 각 점에서 K-NN 후보를 뽑아 검사
+            pairs = knnPairs(P, opts.knnK, opts.maxPairDist);
+        otherwise
+            error('Unknown pairMode: %s', opts.pairMode);
+    end
+    
+    
+    
+    
+    if ~isinf(opts.maxPairDist) % 너무 멀리 떨어진 점들 제외
+        d = vecnorm(P(pairs(:,1),:) - P(pairs(:,2),:), 2, 2);
+        pairs = pairs(d <= opts.maxPairDist, :);
+    end
+    
+    if isempty(pairs), error('형성된 쌍이 없습니다.'); end
+    
+    
+    
+    % --- 3) Skeleton 그래프 및 경로 탐색 준비 ---
+    [G, lin2node, node2lin] = skeletonGraph(skel);
+    
+    % skeleton 연결성 검증 + arc/chord 필터링
+    pairs = validatePairsOnSkeleton(pairs, P_rc, P_rc_s, skel, G, lin2node, node2lin, opts.maxArcChord);
+    
+    % 한 점의 연결 수 제한(선택)
+    if isfinite(opts.maxDegree)
+        pairs = capNodeDegree(pairs, P, opts.maxDegree);
+    end
+    
 
+else
 
+    opts_skel_used = opts_skel;
 
-%skel = makeSkeletonRobust(Igray, opts_skel);
-[BW_raw,BW_morph,skel,opts_skel_used] = makeSkeletonRobust(Igray,opts_skel);
+    P = saved_node_point.P;
+    P_rc = saved_node_point.P_rc;
+    P_rc_s = saved_node_point.P_rc_s;
+    pairs = saved_node_point.pairs;
+    skel = saved_node_point.skel;
 
-fig_BW_raw = figure('Name','After binarize');
-imshow(BW_raw)
+    [G, lin2node, node2lin] = skeletonGraph(skel);
 
-fig_BW_morph = figure('Name','After morphology trimming');
-imshow(BW_morph)
-
-
-% (요구사항 1) skeleton 결과 한 번 표시
-figPrev = figure('Name','Skeleton preview');
-tiledlayout(figPrev,1,2,"Padding","compact","TileSpacing","compact");
-nexttile; imshow(Irgb, 'Border','tight'); title('Original');
-nexttile; imshow(skel, []); title('Skeleton (press any key to continue)');
-set(figPrev,'Color','w'); drawnow;
-
-if ~exist(opts.saveDir,'dir'), mkdir(opts.saveDir); end
-
-
-exportgraphics(fig_BW_raw, fullfile(opts.saveDir,'fig0_binary.png'), 'Resolution',600);
-exportgraphics(fig_BW_morph, fullfile(opts.saveDir,'fig0_morphology.png'), 'Resolution',600);
-exportgraphics(figPrev, fullfile(opts.saveDir,'fig0_skeleton_with_spurPrune.png'), 'Resolution',600);
-
-
-waitforbuttonpress; close(fig_BW_raw);close(fig_BW_morph); close(figPrev);
-
-
-
-% --- 1) 인터랙티브 클릭 ---
-% figure('Name','Click node points (Enter to finish)'); imshow(Irgb, 'Border','tight');
-% title('원하는 만큼 점을 찍고 Enter');
-% [x,y] = ginput(); close;       % x,y라는 벡터가 2개 나옴 (cols,rows)
-% if numel(x) < 2, error('최소 2개 점이 필요합니다.'); end
-% P      = [x y];                 % Nx2, [x y] 두 벡터 합쳐서 하나의 행렬로. 현재는 column, row임
-% P_rc   = [P(:,2) P(:,1)];       % [r c] 근데 보통 row column을 쓰므로 그렇게 바꿈
-
-[P, P_rc] = collectPointsInteractive(Irgb,skel,opts.saveDir);   % P=[x y], P_rc=[r c]
-
-
-if size(P,1) < 2, error('최소 2개 점이 필요합니다.'); end
-
-
-% Skeleton 픽셀로 스냅
-[rr,cc] = find(skel); 
-SkelRC = [rr cc];
-
-KDT     = KDTreeSearcher(double(SkelRC));
-idx     = knnsearch(KDT,double(P_rc));
-P_rc_s  = SkelRC(idx,:);
-
-% --- 2) 쌍 구성 ---
-% switch lower(mode)
-%     case 'mutual'
-%         pairs = mutualNearestPairs(P); % Mutual nearest neighbor만 뽑아 pair 형성 (인덱스 i<j)
-%     case 'sequential'
-%         n = size(P,1); pairs = [(1:n-1)' (2:n)']; % 클릭 순서대로 pair 형성
-%     otherwise
-%         error('mode must be "mutual" or "sequential".');
-% end
-
-switch lower(opts.pairMode)
-    case 'quadrant'
-        % 각 점마다 4사분면(NE/NW/SE/SW)에서 가장 가까운 점을 후보로 선정
-        pairs = quadrantPairs(P, opts.maxPairDist);
-    case 'knn'
-        % 각 점에서 K-NN 후보를 뽑아 검사
-        pairs = knnPairs(P, opts.knnK, opts.maxPairDist);
-    otherwise
-        error('Unknown pairMode: %s', opts.pairMode);
 end
-
-
-
-
-if ~isinf(opts.maxPairDist) % 너무 멀리 떨어진 점들 제외
-    d = vecnorm(P(pairs(:,1),:) - P(pairs(:,2),:), 2, 2);
-    pairs = pairs(d <= opts.maxPairDist, :);
-end
-
-if isempty(pairs), error('형성된 쌍이 없습니다.'); end
-
-
-
-% --- 3) Skeleton 그래프 및 경로 탐색 준비 ---
-[G, lin2node, node2lin] = skeletonGraph(skel);
-
-% skeleton 연결성 검증 + arc/chord 필터링
-pairs = validatePairsOnSkeleton(pairs, P_rc, P_rc_s, skel, G, lin2node, node2lin, opts.maxArcChord);
-
-% 한 점의 연결 수 제한(선택)
-if isfinite(opts.maxDegree)
-    pairs = capNodeDegree(pairs, P, opts.maxDegree);
-end
-
 
 
 % --- 4) 각 쌍 처리 ---
@@ -236,16 +253,22 @@ for k=1:size(pairs,1)
     
     M.max_sagitta_px_std = E.max_sag_px_std;
     M.rms_sagitta_px_std = E.rms_sag_px_std;
+    M.mean_sagitta_px_std = E.mean_sag_px_std;
     M.length_ratio_std   = E.lratio_std;
+
     M_raw.max_sagitta_px_std = E_raw.max_sag_px_std;
     M_raw.rms_sagitta_px_std = E_raw.rms_sag_px_std;
+    M_raw.mean_sagitta_px_std = E_raw.mean_sag_px_std;
     M_raw.length_ratio_std   = E_raw.lratio_std;
 
     if ~isempty(opts.nmPerPx)
         M.max_sagitta_nm_std = E.max_sag_nm_std;
         M.rms_sagitta_nm_std = E.rms_sag_nm_std;
+        M.mean_sagitta_nm_std = E.rms_sag_nm_std;
+
         M_raw.max_sagitta_nm_std = E_raw.max_sag_nm_std;
         M_raw.rms_sagitta_nm_std = E_raw.rms_sag_nm_std;
+        M_raw.mean_sagitta_nm_std = E_raw.rms_sag_nm_std;        
     end
 
 
@@ -359,15 +382,15 @@ for k=1:size(pairs,1)
 
 
     vars = {'pair_id','idx1','idx2', ...
-            'arc_len_px','chord_len_px','arc_over_chord','signed_dist_px','max_sagitta_px','rms_sagitta_px','max_sagitta_px_std','rms_sagitta_px_std','area_proj_px2'};
-    row = {k,i,j, M.arc_len_px, M.chord_len_px, M.length_ratio, M.signed_dist_px, M.max_sagitta_px, M.rms_sagitta_px,M.max_sagitta_px_std, M.rms_sagitta_px_std, M.area_proj_px2};
-    row_raw = {k,i,j, M_raw.arc_len_px, M_raw.chord_len_px, M_raw.length_ratio, M_raw.signed_dist_px, M_raw.max_sagitta_px, M_raw.rms_sagitta_px,M_raw.max_sagitta_px_std, M_raw.rms_sagitta_px_std, M_raw.area_proj_px2};
+            'arc_len_px','chord_len_px','arc_over_chord','signed_dist_px','max_sagitta_px','mean_sagitta_px','rms_sagitta_px','max_sagitta_px_std','mean_sagitta_px_std','rms_sagitta_px_std','area_proj_px2','area_proj_abs_px2'};
+    row = {k,i,j, M.arc_len_px, M.chord_len_px, M.length_ratio, M.signed_dist_px, M.max_sagitta_px, M.mean_sagitta_px, M.rms_sagitta_px,M.max_sagitta_px_std, M.mean_sagitta_px_std, M.rms_sagitta_px_std, M.area_proj_px2,M.area_proj_abs_px2};
+    row_raw = {k,i,j, M_raw.arc_len_px, M_raw.chord_len_px, M_raw.length_ratio, M_raw.signed_dist_px, M_raw.max_sagitta_px, M_raw.mean_sagitta_px, M_raw.rms_sagitta_px,M_raw.max_sagitta_px_std, M_raw.mean_sagitta_px_std, M_raw.rms_sagitta_px_std, M_raw.area_proj_px2, M_raw.area_proj_abs_px2};
 
 
     if ~isempty(opts.nmPerPx)
-        vars = [vars, {'arc_len_nm','chord_len_nm','signed_dist_nm','max_sagitta_nm','rms_sagitta_nm','max_sagitta_nm_std','rms_sagitta_nm_std','area_proj_nm2'}];
-        row  = [row,  {M.arc_len_nm, M.chord_len_nm, M.signed_dist_nm,M.max_sagitta_nm, M.rms_sagitta_nm,  M.max_sagitta_nm_std, M.rms_sagitta_nm_std,M.area_proj_nm2}];
-        row_raw  = [row_raw,  {M_raw.arc_len_nm, M_raw.chord_len_nm, M_raw.signed_dist_nm,M_raw.max_sagitta_nm, M_raw.rms_sagitta_nm,  M_raw.max_sagitta_nm_std, M_raw.rms_sagitta_nm_std,M_raw.area_proj_nm2}];
+        vars = [vars, {'arc_len_nm','chord_len_nm','signed_dist_nm','max_sagitta_nm','mean_sagitta_nm','rms_sagitta_nm','max_sagitta_nm_std','mean_sagitta_nm_std','rms_sagitta_nm_std','area_proj_nm2','area_proj_abs_nm2'}];
+        row  = [row,  {M.arc_len_nm, M.chord_len_nm, M.signed_dist_nm,M.max_sagitta_nm, M.mean_sagitta_nm, M.rms_sagitta_nm,  M.max_sagitta_nm_std,M.mean_sagitta_nm_std, M.rms_sagitta_nm_std,M.area_proj_nm2,M.area_proj_abs_nm2}];
+        row_raw  = [row_raw,  {M_raw.arc_len_nm, M_raw.chord_len_nm, M_raw.signed_dist_nm,M_raw.max_sagitta_nm, M_raw.mean_sagitta_nm, M_raw.rms_sagitta_nm,  M_raw.max_sagitta_nm_std, M_raw.mean_sagitta_nm_std, M_raw.rms_sagitta_nm_std,M_raw.area_proj_nm2,M_raw.area_proj_abs_nm2}];
 
     end
     Trows = [Trows; row];
@@ -434,7 +457,7 @@ writetable(Metrics, fullfile(opts.saveDir,'metrics.csv'));
 
 Metrics_raw = cell2table(Trows_raw, 'VariableNames', vars);
 save(fullfile(opts.saveDir,'metrics_raw.mat'),'Metrics_raw');
-writetable(Metrics, fullfile(opts.saveDir,'metrics_raw.csv'));
+writetable(Metrics_raw, fullfile(opts.saveDir,'metrics_raw.csv'));
 
 save(fullfile(opts.saveDir,'parameters_opts.mat'),'opts')
 save(fullfile(opts.saveDir,'parameters_opts_skel.mat'),'opts_skel_used')

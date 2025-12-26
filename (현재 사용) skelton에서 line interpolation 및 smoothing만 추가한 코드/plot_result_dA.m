@@ -30,10 +30,10 @@ end
 % Bilayer에서는 밝은 영역을 향할 때 +1, 검정 영역을 향할 때 -1
 
 
-dA = Metrics.area_proj_nm2 ./ (Metrics.chord_len_nm.^2);
+dA =  2.*sqrt(3) .* (Metrics.area_proj_nm2 ./ (Metrics.chord_len_nm.^2));
 
 dx = Metrics.chord_len_nm / length(Metrics.signed_dist_nm);
-dA_error = Metrics.rms_sagitta_nm_std .* dx .* sqrt(length(Metrics.signed_dist_nm)) ./ (Metrics.chord_len_nm.^2);
+dA_error = 2.*sqrt(3) .* Metrics.mean_sagitta_nm_std .* dx .* sqrt(length(Metrics.signed_dist_nm)) ./ (Metrics.chord_len_nm.^2);
 
 
 if ~(length(p_nrm) == size(dA,1))

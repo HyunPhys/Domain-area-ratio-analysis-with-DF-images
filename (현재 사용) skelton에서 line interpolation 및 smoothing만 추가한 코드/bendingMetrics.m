@@ -24,6 +24,7 @@ M.arc_len_px      = arc_len; % 경로(호)의 길이 (px)
 M.chord_len_px    = chord_len; % 두 점을 잇는 직선(현) 길이 (px)
 M.length_ratio = arc_len / max(chord_len, eps); % arc_len / chord_len (1이면 직선, 클수록 더 굽음)
 M.max_sagitta_px  = max(abs(signed_dist)); % 직선에서의 최대 수직 편차 (px)
+M.mean_sagitta_px  = mean(signed_dist); % 편차의 평균
 M.rms_sagitta_px  = sqrt(mean(signed_dist.^2)); % 편차의 RMS (px)
 M.s_norm       = s / max(arc_len, eps); % 경로를 0~1로 정규화한 누적 호좌표
 M.signed_dist_px  = signed_dist; % 각 경로점의 부호 있는 직선 수직 편차 배열 (px)
@@ -34,6 +35,7 @@ if ~isempty(nmPerPx)
     M.arc_len_nm     = M.arc_len_px     * nmPerPx;
     M.chord_len_nm   = M.chord_len_px   * nmPerPx;
     M.max_sagitta_nm = M.max_sagitta_px * nmPerPx;
+    M.mean_sagitta_nm = M.mean_sagitta_px * nmPerPx;
     M.rms_sagitta_nm = M.rms_sagitta_px * nmPerPx;
     M.signed_dist_nm = M.signed_dist_px * nmPerPx;
 end
@@ -76,11 +78,16 @@ yu = accumarray(ic, ys, [], @mean);
 
 % --- trapezoidal rule: ∫ |y| dx ---
 dx = diff(xu);
-A_proj_px2 = sum( 0.5 * (abs(yu(1:end-1)) + abs(yu(2:end))) .* dx );
+
+A_proj_px2 = sum( 0.5 * (yu(1:end-1) + yu(2:end)) .* dx );
+A_proj_abs_px2 = sum( 0.5 * (abs(yu(1:end-1)) + abs(yu(2:end))) .* dx );
+
 
 % Save px^2 result
 M.x_proj_px = x_proj;   % px 단위 projection coordinate
 M.area_proj_px2 = A_proj_px2;
+M.area_proj_abs_px2 = A_proj_abs_px2;
+
 
 end
 
@@ -89,7 +96,11 @@ end
 % --- nm^2 변환 ---
 if ~isempty(nmPerPx)
     A_proj_nm2 = (nmPerPx^2) * A_proj_px2;
+    A_proj_abs_nm2 = (nmPerPx^2) * A_proj_abs_px2;
+
     M.area_proj_nm2 = A_proj_nm2;
+    M.area_proj_abs_nm2 = A_proj_abs_nm2;
+
     M.x_proj_nm = x_proj * nmPerPx;
 end
 
